@@ -49,7 +49,7 @@ def sample_images(
         if args.sample_every_n_steps is None and args.sample_every_n_epochs is None:
             return
         if args.sample_every_n_epochs is not None:
-            # sample_every_n_steps は無視する
+            # ignore sample_every_n_steps when sampling by epoch interval
             if epoch is None or epoch % args.sample_every_n_epochs != 0:
                 return
         else:
@@ -57,9 +57,9 @@ def sample_images(
                 return
 
     logger.info("")
-    logger.info(f"generating sample images at step / サンプル画像生成 ステップ: {steps}")
+    logger.info(f"generating sample images at step: {steps}")
     if not os.path.isfile(args.sample_prompts) and sample_prompts_te_outputs is None:
-        logger.error(f"No prompt file / プロンプトファイルがありません: {args.sample_prompts}")
+        logger.error(f"No prompt file: {args.sample_prompts}")
         return
 
     distributed_state = PartialState()  # for multi gpu distributed inference. this is a singleton, so it's safe to use it here
@@ -580,8 +580,8 @@ def save_flux_model_on_train_end(
     train_util.save_sd_model_on_train_end_common(args, True, True, epoch, global_step, sd_saver, None)
 
 
-# epochとstepの保存、メタデータにepoch/stepが含まれ引数が同じになるため、統合している
-# on_epoch_end: Trueならepoch終了時、Falseならstep経過時
+# Save at epoch/step. Since metadata includes epoch/step and the arguments would be identical, this is unified into one.
+# on_epoch_end: True to save at end of epoch, False to save after step progressed
 def save_flux_model_on_epoch_end_or_stepwise(
     args: argparse.Namespace,
     on_epoch_end: bool,
@@ -617,31 +617,30 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--clip_l",
         type=str,
-        help="path to clip_l (*.sft or *.safetensors), should be float16 / clip_lのパス（*.sftまたは*.safetensors）、float16が前提",
+    help="path to clip_l (*.sft or *.safetensors), should be float16",
     )
     parser.add_argument(
         "--t5xxl",
         type=str,
-        help="path to t5xxl (*.sft or *.safetensors), should be float16 / t5xxlのパス（*.sftまたは*.safetensors）、float16が前提",
+    help="path to t5xxl (*.sft or *.safetensors), should be float16",
     )
-    parser.add_argument("--ae", type=str, help="path to ae (*.sft or *.safetensors) / aeのパス（*.sftまたは*.safetensors）")
+    parser.add_argument("--ae", type=str, help="path to ae (*.sft or *.safetensors)")
     parser.add_argument(
         "--controlnet_model_name_or_path",
         type=str,
         default=None,
-        help="path to controlnet (*.sft or *.safetensors) / controlnetのパス（*.sftまたは*.safetensors）",
+    help="path to controlnet (*.sft or *.safetensors)",
     )
     parser.add_argument(
         "--t5xxl_max_token_length",
         type=int,
         default=None,
-        help="maximum token length for T5-XXL. if omitted, 256 for schnell and 512 for dev"
-        " / T5-XXLの最大トークン長。省略された場合、schnellの場合は256、devの場合は512",
+    help="Maximum token length for T5-XXL. If omitted: 256 for schnell, 512 for dev",
     )
     parser.add_argument(
         "--apply_t5_attn_mask",
         action="store_true",
-        help="apply attention mask to T5-XXL encode and FLUX double blocks / T5-XXLエンコードとFLUXダブルブロックにアテンションマスクを適用する",
+    help="apply attention mask to T5-XXL encode and FLUX double blocks",
     )
 
     parser.add_argument(
@@ -655,29 +654,28 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
         "--timestep_sampling",
         choices=["sigma", "uniform", "sigmoid", "shift", "flux_shift"],
         default="sigma",
-        help="Method to sample timesteps: sigma-based, uniform random, sigmoid of random normal, shift of sigmoid and FLUX.1 shifting."
-        " / タイムステップをサンプリングする方法：sigma、random uniform、random normalのsigmoid、sigmoidのシフト、FLUX.1のシフト。",
+    help="Method to sample timesteps: sigma-based, uniform random, sigmoid of random normal, shifted sigmoid, FLUX.1 shifting.",
     )
     parser.add_argument(
         "--sigmoid_scale",
         type=float,
         default=1.0,
-        help='Scale factor for sigmoid timestep sampling (only used when timestep-sampling is "sigmoid"). / sigmoidタイムステップサンプリングの倍率（timestep-samplingが"sigmoid"の場合のみ有効）。',
+    help='Scale factor for sigmoid timestep sampling (only used when timestep-sampling is "sigmoid").',
     )
     parser.add_argument(
         "--model_prediction_type",
         choices=["raw", "additive", "sigma_scaled"],
         default="sigma_scaled",
-        help="How to interpret and process the model prediction: "
-        "raw (use as is), additive (add to noisy input), sigma_scaled (apply sigma scaling)."
-        " / モデル予測の解釈と処理方法："
-        "raw（そのまま使用）、additive（ノイズ入力に加算）、sigma_scaled（シグマスケーリングを適用）。",
+        help=(
+            "How to interpret and process the model prediction: "
+            "raw (use as is), additive (add to noisy input), sigma_scaled (apply sigma scaling)."
+        ),
     )
     parser.add_argument(
         "--discrete_flow_shift",
         type=float,
         default=3.0,
-        help="Discrete flow shift for the Euler Discrete Scheduler, default is 3.0. / Euler Discrete Schedulerの離散フローシフト、デフォルトは3.0。",
+    help="Discrete flow shift for the Euler Discrete Scheduler (default: 3.0).",
     )
 
     parser.add_argument(
@@ -685,5 +683,5 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
         type=str,
         choices=["flux", "chroma"],
         default="flux",
-        help="Model type to use for training / トレーニングに使用するモデルタイプ：flux or chroma (default: flux)",
+    help="Model type to use for training: flux or chroma (default: flux)",
     )

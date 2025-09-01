@@ -28,17 +28,18 @@ MODEL_VERSION_CHROMA = "chroma"
 
 def analyze_checkpoint_state(ckpt_path: str) -> Tuple[bool, bool, Tuple[int, int], List[str]]:
     """
-    チェックポイントの状態を分析し、DiffusersかBFLか、devかschnellか、ブロック数を計算して返す。
+    Analyze the checkpoint state and return whether it is Diffusers or BFL format,
+    whether the model is "dev" or "schnell", and the number of double/single blocks.
 
     Args:
-        ckpt_path (str): チェックポイントファイルまたはディレクトリのパス。
+        ckpt_path (str): Path to a checkpoint file or a Diffusers directory.
 
     Returns:
         Tuple[bool, bool, Tuple[int, int], List[str]]:
-            - bool: Diffusersかどうかを示すフラグ。
-            - bool: Schnellかどうかを示すフラグ。
-            - Tuple[int, int]: ダブルブロックとシングルブロックの数。
-            - List[str]: チェックポイントに含まれるキーのリスト。
+            - bool: True if the checkpoint is Diffusers format, otherwise BFL.
+            - bool: True if the model is "schnell", otherwise "dev".
+            - Tuple[int, int]: Number of double blocks and single blocks.
+            - List[str]: List of checkpoint shard paths (or the single file path).
     """
     # check the state dict: Diffusers or BFL, dev or schnell, number of blocks
     logger.info(f"Checking the state dict: Diffusers or BFL, dev or schnell")

@@ -98,7 +98,7 @@ def _load_target_model(
                     raise ex
         except EnvironmentError as ex:
             logger.error(
-                f"model is not found as a file or in Hugging Face, perhaps file name is wrong? / 指定したモデル名のファイル、またはHugging Faceのモデルが見つかりません。ファイル名が誤っているかもしれません: {name_or_path}"
+                f"model is not found as a file or in Hugging Face, perhaps file name is wrong? {name_or_path}"
             )
             raise ex
 
@@ -125,7 +125,7 @@ def _load_target_model(
         logit_scale = None
         ckpt_info = None
 
-    # VAEを読み込む
+    # load VAE if specified
     if vae_path is not None:
         vae = model_util.load_vae(vae_path, weight_dtype)
         logger.info("additional VAE loaded")
@@ -168,12 +168,12 @@ def match_mixed_precision(args, weight_dtype):
     if args.full_fp16:
         assert (
             weight_dtype == torch.float16
-        ), "full_fp16 requires mixed precision='fp16' / full_fp16を使う場合はmixed_precision='fp16'を指定してください。"
+    ), "full_fp16 requires mixed precision='fp16'"
         return weight_dtype
     elif args.full_bf16:
         assert (
             weight_dtype == torch.bfloat16
-        ), "full_bf16 requires mixed precision='bf16' / full_bf16を使う場合はmixed_precision='bf16'を指定してください。"
+    ), "full_bf16 requires mixed precision='bf16'"
         return weight_dtype
     else:
         return None
@@ -264,8 +264,8 @@ def save_sd_model_on_train_end(
     )
 
 
-# epochとstepの保存、メタデータにepoch/stepが含まれ引数が同じになるため、統合している
-# on_epoch_end: Trueならepoch終了時、Falseならstep経過時
+# Save at epoch/step: unified since metadata includes epoch/step and arguments align
+# on_epoch_end: True to save at epoch end, False to save stepwise
 def save_sd_model_on_epoch_end_or_stepwise(
     args: argparse.Namespace,
     on_epoch_end: bool,
@@ -328,25 +328,25 @@ def save_sd_model_on_epoch_end_or_stepwise(
 
 def add_sdxl_training_arguments(parser: argparse.ArgumentParser, support_text_encoder_caching: bool = True):
     parser.add_argument(
-        "--cache_text_encoder_outputs", action="store_true", help="cache text encoder outputs / text encoderの出力をキャッシュする"
+        "--cache_text_encoder_outputs", action="store_true", help="cache text encoder outputs"
     )
     parser.add_argument(
         "--cache_text_encoder_outputs_to_disk",
         action="store_true",
-        help="cache text encoder outputs to disk / text encoderの出力をディスクにキャッシュする",
+        help="cache text encoder outputs to disk",
     )
     parser.add_argument(
         "--disable_mmap_load_safetensors",
         action="store_true",
-        help="disable mmap load for safetensors. Speed up model loading in WSL environment / safetensorsのmmapロードを無効にする。WSL環境等でモデル読み込みを高速化できる",
+        help="disable mmap load for safetensors (can speed up model loading in WSL environments)",
     )
 
 
 def verify_sdxl_training_args(args: argparse.Namespace, supportTextEncoderCaching: bool = True):
-    assert not args.v2, "v2 cannot be enabled in SDXL training / SDXL学習ではv2を有効にすることはできません"
+    assert not args.v2, "v2 cannot be enabled in SDXL training"
 
     if args.clip_skip is not None:
-        logger.warning("clip_skip will be unexpected / SDXL学習ではclip_skipは動作しません")
+        logger.warning("clip_skip does not work in SDXL training")
 
     # if args.multires_noise_iterations:
     #     logger.info(
@@ -369,8 +369,7 @@ def verify_sdxl_training_args(args: argparse.Namespace, supportTextEncoderCachin
         if args.cache_text_encoder_outputs_to_disk and not args.cache_text_encoder_outputs:
             args.cache_text_encoder_outputs = True
             logger.warning(
-                "cache_text_encoder_outputs is enabled because cache_text_encoder_outputs_to_disk is enabled / "
-                + "cache_text_encoder_outputs_to_diskが有効になっているためcache_text_encoder_outputsが有効になりました"
+                "cache_text_encoder_outputs is enabled because cache_text_encoder_outputs_to_disk is enabled"
             )
 
 

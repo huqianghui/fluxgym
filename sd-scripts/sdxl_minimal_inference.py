@@ -1,5 +1,4 @@
-# 手元で推論を行うための最低限のコード。HuggingFace／DiffusersのCLIP、schedulerとVAEを使う
-# Minimal code for performing inference at local. Use HuggingFace/Diffusers CLIP, scheduler and VAE
+# Minimal code for performing local inference. Uses HuggingFace/Diffusers CLIP, scheduler, and VAE.
 
 import argparse
 import datetime
@@ -31,16 +30,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# scheduler: このあたりの設定はSD1/2と同じでいいらしい
-# scheduler: The settings around here seem to be the same as SD1/2
+# Scheduler settings (same as SD1/2)
 SCHEDULER_LINEAR_START = 0.00085
 SCHEDULER_LINEAR_END = 0.0120
 SCHEDULER_TIMESTEPS = 1000
 SCHEDLER_SCHEDULE = "scaled_linear"
 
 
-# Time EmbeddingはDiffusersからのコピー
-# Time Embedding is copied from Diffusers
+# Time Embedding (copied from Diffusers)
 
 
 def timestep_embedding(timesteps, dim, max_period=10000, repeat_only=False):
@@ -78,9 +75,9 @@ def get_timestep_embedding(x, outdim):
 
 
 if __name__ == "__main__":
-    # 画像生成条件を変更する場合はここを変更 / change here to change image generation conditions
+    # Change here to modify image generation conditions
 
-    # SDXLの追加のvector embeddingへ渡す値 / Values to pass to additional vector embedding of SDXL
+    # Values to pass to additional vector embedding of SDXL
     target_height = 1024
     target_width = 1024
     original_height = target_height
@@ -114,33 +111,25 @@ if __name__ == "__main__":
     if args.prompt2 is None:
         args.prompt2 = args.prompt
 
-    # HuggingFaceのmodel id
+    # HuggingFace model ids
     text_encoder_1_name = "openai/clip-vit-large-patch14"
     text_encoder_2_name = "laion/CLIP-ViT-bigG-14-laion2B-39B-b160k"
 
-    # checkpointを読み込む。モデル変換についてはそちらの関数を参照
-    # Load checkpoint. For model conversion, see this function
+    # Load checkpoint. For model conversion, see the helper function.
 
-    # 本体RAMが少ない場合はGPUにロードするといいかも
-    # If the main RAM is small, it may be better to load it on the GPU
+    # If system RAM is limited, consider loading to GPU
     text_model1, text_model2, vae, unet, _, _ = sdxl_model_util.load_models_from_sdxl_checkpoint(
         sdxl_model_util.MODEL_VERSION_SDXL_BASE_V1_0, args.ckpt_path, "cpu"
     )
 
-    # Text Encoder 1はSDXL本体でもHuggingFaceのものを使っている
-    # In SDXL, Text Encoder 1 is also using HuggingFace's
+    # In SDXL, Text Encoder 1 also uses HuggingFace's implementation
 
-    # Text Encoder 2はSDXL本体ではopen_clipを使っている
-    # それを使ってもいいが、SD2のDiffusers版に合わせる形で、HuggingFaceのものを使う
-    # 重みの変換コードはSD2とほぼ同じ
-    # In SDXL, Text Encoder 2 is using open_clip
-    # It's okay to use it, but to match the Diffusers version of SD2, use HuggingFace's
-    # The weight conversion code is almost the same as SD2
+    # SDXL uses open_clip for Text Encoder 2.
+    # It's fine to use open_clip, but to match the Diffusers SD2 variant, we use HuggingFace's instead.
+    # The weight conversion code is almost the same as SD2.
 
-    # VAEの構造はSDXLもSD1/2と同じだが、重みは異なるようだ。何より謎のscale値が違う
-    # fp16でNaNが出やすいようだ
-    # The structure of VAE is the same as SD1/2, but the weights seem to be different. Above all, the mysterious scale value is different.
-    # NaN seems to be more likely to occur in fp16
+    # The VAE structure is the same as SD1/2, but weights differ and the scale value is different.
+    # fp16 may cause NaNs more frequently.
 
     unet.to(DEVICE, dtype=DTYPE)
     unet.eval()
@@ -158,7 +147,7 @@ if __name__ == "__main__":
     text_model2.eval()
 
     unet.set_use_memory_efficient_attention(True, False)
-    if torch.__version__ >= "2.0.0":  # PyTorch 2.0.0 以上対応のxformersなら以下が使える
+    if torch.__version__ >= "2.0.0":  # if xformers supports PyTorch >= 2.0.0, the following can be used
         vae.set_use_memory_efficient_attention_xformers(True)
 
     # Tokenizers
@@ -188,7 +177,7 @@ if __name__ == "__main__":
     )
 
     def generate_image(prompt, prompt2, negative_prompt, seed=None):
-        # 将来的にサイズ情報も変えられるようにする / Make it possible to change the size information in the future
+    # In the future we may also vary the size information
         # prepare embedding
         with torch.no_grad():
             # vector
@@ -197,13 +186,11 @@ if __name__ == "__main__":
             emb3 = get_timestep_embedding(torch.FloatTensor([target_height, target_width]).unsqueeze(0), 256)
             # logger.info("emb1", emb1.shape)
             c_vector = torch.cat([emb1, emb2, emb3], dim=1).to(DEVICE, dtype=DTYPE)
-            uc_vector = c_vector.clone().to(
-                DEVICE, dtype=DTYPE
-            )  # ちょっとここ正しいかどうかわからない I'm not sure if this is right
+            uc_vector = c_vector.clone().to(DEVICE, dtype=DTYPE)  # not fully sure this is ideal
 
             # crossattn
 
-        # Text Encoderを二つ呼ぶ関数  Function to call two Text Encoders
+    # Function to call both Text Encoders
         def call_text_encoder(text, text2):
             # text encoder 1
             batch_encoding = tokenizer1(
@@ -219,7 +206,7 @@ if __name__ == "__main__":
             with torch.no_grad():
                 enc_out = text_model1(tokens, output_hidden_states=True, return_dict=True)
                 text_embedding1 = enc_out["hidden_states"][11]
-                # text_embedding = pipe.text_encoder.text_model.final_layer_norm(text_embedding)    # layer normは通さないらしい
+                # text_embedding = pipe.text_encoder.text_model.final_layer_norm(text_embedding)    # layer norm may not be applied
 
             # text encoder 2
             # tokens = tokenizer2(text2).to(DEVICE)
@@ -239,7 +226,7 @@ if __name__ == "__main__":
                 # logger.info("hidden_states2", text_embedding2_penu.shape)
                 text_embedding2_pool = enc_out["text_embeds"]  # do not support Textual Inversion
 
-            # 連結して終了 concat and finish
+            # Concatenate and return
             text_embedding = torch.cat([text_embedding1, text_embedding2_penu], dim=2)
             return text_embedding, text_embedding2_pool
 
@@ -255,7 +242,7 @@ if __name__ == "__main__":
         text_embeddings = torch.cat([uc_ctx, c_ctx])
         vector_embeddings = torch.cat([uc_vector, c_vector])
 
-        # メモリ使用量を減らすにはここでText Encoderを削除するかCPUへ移動する
+    # To reduce memory usage, remove the Text Encoders here or move them to CPU
 
         if seed is not None:
             random.seed(seed)
@@ -270,8 +257,7 @@ if __name__ == "__main__":
             generator = None
 
         # get the initial random noise unless the user supplied it
-        # SDXLはCPUでlatentsを作成しているので一応合わせておく、Diffusersはtarget deviceでlatentsを作成している
-        # SDXL creates latents in CPU, Diffusers creates latents in target device
+    # SDXL creates latents on CPU; Diffusers creates latents on the target device
         latents_shape = (1, 4, target_height // 8, target_width // 8)
         latents = torch.randn(
             latents_shape,
@@ -286,8 +272,7 @@ if __name__ == "__main__":
         # set timesteps
         scheduler.set_timesteps(steps, DEVICE)
 
-        # このへんはDiffusersからのコピペ
-        # Copy from Diffusers
+    # Copied from Diffusers
         timesteps = scheduler.timesteps.to(DEVICE)  # .to(DTYPE)
         num_latent_input = 2
         with torch.no_grad():
@@ -318,7 +303,7 @@ if __name__ == "__main__":
         image = (image * 255).round().astype("uint8")
         image = [Image.fromarray(im) for im in image]
 
-        # 保存して終了 save and finish
+    # Save and finish
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         for i, img in enumerate(image):
             img.save(os.path.join(args.output_dir, f"image_{timestamp}_{i:03d}.png"))

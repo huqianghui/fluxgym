@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 def add_config_arguments(parser: argparse.ArgumentParser):
     parser.add_argument(
-        "--dataset_config", type=Path, default=None, help="config file for detail settings / 詳細な設定用の設定ファイル"
+        "--dataset_config", type=Path, default=None, help="config file for detailed settings"
     )
 
 
@@ -265,8 +265,7 @@ class ConfigSanitizer:
 
     def __init__(self, support_dreambooth: bool, support_finetuning: bool, support_controlnet: bool, support_dropout: bool) -> None:
         assert support_dreambooth or support_finetuning or support_controlnet, (
-            "Neither DreamBooth mode nor fine tuning mode nor controlnet mode specified. Please specify one mode or more."
-            + " / DreamBooth モードか fine tuning モードか controlnet モードのどれも指定されていません。1つ以上指定してください。"
+            "Neither DreamBooth mode nor fine tuning mode nor controlnet mode specified. Please specify one or more modes."
         )
 
         self.db_subset_schema = self.__merge_dict(
@@ -329,7 +328,7 @@ class ConfigSanitizer:
                     return Schema(self.db_dataset_schema)(dataset_config)
                 else:
                     raise voluptuous.Invalid(
-                        "DreamBooth subset and fine tuning subset cannot be mixed in the same dataset. Please split them into separate datasets. / DreamBoothのサブセットとfine tuninのサブセットを同一のデータセットに混在させることはできません。別々のデータセットに分割してください。"
+                        "DreamBooth subset and fine tuning subset cannot be mixed in the same dataset. Please split them into separate datasets."
                     )
 
             self.dataset_schema = validate_flex_dataset
@@ -371,8 +370,8 @@ class ConfigSanitizer:
         try:
             return self.user_config_validator(user_config)
         except MultipleInvalid:
-            # TODO: エラー発生時のメッセージをわかりやすくする
-            logger.error("Invalid user config / ユーザ設定の形式が正しくないようです")
+            # TODO: Improve error message clarity
+            logger.error("Invalid user config")
             raise
 
     # NOTE: In nature, argument parser result is not needed to be sanitize
@@ -382,9 +381,7 @@ class ConfigSanitizer:
             return self.argparse_config_validator(argparse_namespace)
         except MultipleInvalid:
             # XXX: this should be a bug
-            logger.error(
-                "Invalid cmdline parsed arguments. This should be a bug. / コマンドラインのパース結果が正しくないようです。プログラムのバグの可能性が高いです。"
-            )
+            logger.error("Invalid cmdline parsed arguments. This should be a bug.")
             raise
 
     # NOTE: value would be overwritten by latter dict if there is already the same key
@@ -610,7 +607,7 @@ def generate_dreambooth_subsets_config_by_subdirs(train_data_dir: Optional[str] 
         try:
             n_repeats = int(tokens[0])
         except ValueError as e:
-            logger.warning(f"ignore directory without repeats / 繰り返し回数のないディレクトリを無視します: {name}")
+            logger.warning(f"ignore directory without repeats: {name}")
             return 0, ""
         caption_by_folder = "_".join(tokens[1:])
         return n_repeats, caption_by_folder
@@ -675,7 +672,7 @@ def generate_controlnet_subsets_config_by_subdirs(
 def load_user_config(file: str) -> dict:
     file: Path = Path(file)
     if not file.is_file():
-        raise ValueError(f"file not found / ファイルが見つかりません: {file}")
+        raise ValueError(f"file not found: {file}")
 
     if file.name.lower().endswith(".json"):
         try:
@@ -683,7 +680,7 @@ def load_user_config(file: str) -> dict:
                 config = json.load(f)
         except Exception:
             logger.error(
-                f"Error on parsing JSON config file. Please check the format. / JSON 形式の設定ファイルの読み込みに失敗しました。文法が正しいか確認してください。: {file}"
+                f"Error parsing JSON config file. Please check the format: {file}"
             )
             raise
     elif file.name.lower().endswith(".toml"):
@@ -691,11 +688,11 @@ def load_user_config(file: str) -> dict:
             config = toml.load(file)
         except Exception:
             logger.error(
-                f"Error on parsing TOML config file. Please check the format. / TOML 形式の設定ファイルの読み込みに失敗しました。文法が正しいか確認してください。: {file}"
+                f"Error parsing TOML config file. Please check the format: {file}"
             )
             raise
     else:
-        raise ValueError(f"not supported config file format / 対応していない設定ファイルの形式です: {file}")
+        raise ValueError(f"unsupported config file format: {file}")
 
     return config
 

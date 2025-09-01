@@ -71,34 +71,34 @@ def train(args):
 
     if args.model_type != "flux":
         raise ValueError(
-            f"FLUX.1 ControlNet training requires model_type='flux'. / FLUX.1 ControlNetの学習にはmodel_type='flux'を指定してください。"
+            "FLUX.1 ControlNet training requires model_type='flux'."
         )
 
     # assert (
     #     not args.weighted_captions
-    # ), "weighted_captions is not supported currently / weighted_captionsは現在サポートされていません"
+    # ), "weighted_captions is not supported currently"
     if args.cache_text_encoder_outputs_to_disk and not args.cache_text_encoder_outputs:
         logger.warning(
-            "cache_text_encoder_outputs_to_disk is enabled, so cache_text_encoder_outputs is also enabled / cache_text_encoder_outputs_to_diskが有効になっているため、cache_text_encoder_outputsも有効になります"
+            "cache_text_encoder_outputs_to_disk is enabled, so cache_text_encoder_outputs is also enabled"
         )
         args.cache_text_encoder_outputs = True
 
     if args.cpu_offload_checkpointing and not args.gradient_checkpointing:
         logger.warning(
-            "cpu_offload_checkpointing is enabled, so gradient_checkpointing is also enabled / cpu_offload_checkpointingが有効になっているため、gradient_checkpointingも有効になります"
+            "cpu_offload_checkpointing is enabled, so gradient_checkpointing is also enabled"
         )
         args.gradient_checkpointing = True
 
     assert (
         args.blocks_to_swap is None or args.blocks_to_swap == 0
     ) or not args.cpu_offload_checkpointing, (
-        "blocks_to_swap is not supported with cpu_offload_checkpointing / blocks_to_swapはcpu_offload_checkpointingと併用できません"
+    "blocks_to_swap is not supported with cpu_offload_checkpointing"
     )
 
     cache_latents = args.cache_latents
 
     if args.seed is not None:
-        set_seed(args.seed)  # 乱数系列を初期化する
+        set_seed(args.seed)  # initialize random seed sequence
 
     # prepare caching strategy: this must be set before preparing dataset. because dataset may use this strategy for initialization.
     if args.cache_latents:
@@ -107,7 +107,7 @@ def train(args):
         )
         strategy_base.LatentsCachingStrategy.set_strategy(latents_caching_strategy)
 
-    # データセットを準備する
+    # Prepare dataset
     if args.dataset_class is None:
         blueprint_generator = BlueprintGenerator(ConfigSanitizer(False, False, True, True))
         if args.dataset_config is not None:
@@ -116,7 +116,7 @@ def train(args):
             ignored = ["train_data_dir", "conditioning_data_dir"]
             if any(getattr(args, attr) is not None for attr in ignored):
                 logger.warning(
-                    "ignore following options because config file is found: {0} / 設定ファイルが利用されるため以下のオプションは無視されます: {0}".format(
+                    "Ignoring the following options because a config file is provided: {0}".format(
                         ", ".join(ignored)
                     )
                 )
@@ -142,7 +142,7 @@ def train(args):
     ds_for_collator = train_dataset_group if args.max_data_loader_n_workers == 0 else None
     collator = train_util.collator_class(current_epoch, current_step, ds_for_collator)
 
-    train_dataset_group.verify_bucket_reso_steps(16)  # TODO これでいいか確認
+    train_dataset_group.verify_bucket_reso_steps(16)  # TODO: confirm this value is appropriate
 
     _, is_schnell, _, _ = flux_utils.analyze_checkpoint_state(args.pretrained_model_name_or_path)
     if args.debug_dataset:
@@ -161,29 +161,27 @@ def train(args):
         train_util.debug_dataset(train_dataset_group, True)
         return
     if len(train_dataset_group) == 0:
-        logger.error(
-            "No data found. Please verify the metadata file and train_data_dir option. / 画像がありません。メタデータおよびtrain_data_dirオプションを確認してください。"
-        )
+        logger.error("No data found. Please verify the metadata file and train_data_dir option.")
         return
 
     if cache_latents:
         assert (
             train_dataset_group.is_latent_cacheable()
-        ), "when caching latents, either color_aug or random_crop cannot be used / latentをキャッシュするときはcolor_augとrandom_cropは使えません"
+    ), "when caching latents, either color_aug or random_crop cannot be used"
 
     if args.cache_text_encoder_outputs:
         assert (
             train_dataset_group.is_text_encoder_output_cacheable()
-        ), "when caching text encoder output, either caption_dropout_rate, shuffle_caption, token_warmup_step or caption_tag_dropout_rate cannot be used / text encoderの出力をキャッシュするときはcaption_dropout_rate, shuffle_caption, token_warmup_step, caption_tag_dropout_rateは使えません"
+    ), "when caching text encoder output, caption_dropout_rate, shuffle_caption, token_warmup_step or caption_tag_dropout_rate cannot be used"
 
-    # acceleratorを準備する
+    # Prepare accelerator
     logger.info("prepare accelerator")
     accelerator = train_util.prepare_accelerator(args)
 
-    # mixed precisionに対応した型を用意しておき適宜castする
+    # Prepare dtypes for mixed precision and cast appropriately
     weight_dtype, save_dtype = train_util.prepare_dtype(args)
 
-    # モデルを読み込む
+    # Load models
 
     # load VAE for caching latents
     ae = None
@@ -291,7 +289,6 @@ def train(args):
         if blocks_to_swap > 0:
             logger.warning(
                 "double_blocks_to_swap and single_blocks_to_swap are deprecated. Use blocks_to_swap instead."
-                " / double_blocks_to_swapとsingle_blocks_to_swapは非推奨です。blocks_to_swapを使ってください。"
             )
             logger.info(
                 f"double_blocks_to_swap={args.double_blocks_to_swap} and single_blocks_to_swap={args.single_blocks_to_swap} are converted to blocks_to_swap={blocks_to_swap}."
@@ -334,7 +331,7 @@ def train(args):
 
     accelerator.print(f"number of trainable parameters: {n_params}")
 
-    # 学習に必要なクラスを準備する
+    # prepare classes required for training
     accelerator.print("prepare optimizer, data loader etc.")
 
     if args.blockwise_fused_optimizers:
@@ -397,7 +394,7 @@ def train(args):
     # some strategies can be None
     train_dataset_group.set_current_strategies()
 
-    # DataLoaderのプロセス数：0 は persistent_workers が使えないので注意
+    # Number of DataLoader worker processes (note: persistent_workers cannot be used with 0)
     n_workers = min(args.max_data_loader_n_workers, os.cpu_count())  # cpu_count or max_data_loader_n_workers
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset_group,
@@ -408,19 +405,17 @@ def train(args):
         persistent_workers=args.persistent_data_loader_workers,
     )
 
-    # 学習ステップ数を計算する
+    # Compute number of training steps
     if args.max_train_epochs is not None:
         args.max_train_steps = args.max_train_epochs * math.ceil(
             len(train_dataloader) / accelerator.num_processes / args.gradient_accumulation_steps
         )
-        accelerator.print(
-            f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}"
-        )
+    accelerator.print(f"override steps. steps for {args.max_train_epochs} epochs: {args.max_train_steps}")
 
-    # データセット側にも学習ステップを送信
+    # Notify dataset of max training steps
     train_dataset_group.set_max_train_steps(args.max_train_steps)
 
-    # lr schedulerを用意する
+    # Prepare LR scheduler(s)
     if args.blockwise_fused_optimizers:
         # prepare lr schedulers for each optimizer
         lr_schedulers = [train_util.get_scheduler_fix(args, optimizer, accelerator.num_processes) for optimizer in optimizers]
@@ -428,11 +423,11 @@ def train(args):
     else:
         lr_scheduler = train_util.get_scheduler_fix(args, optimizer, accelerator.num_processes)
 
-    # 実験的機能：勾配も含めたfp16/bf16学習を行う　モデル全体をfp16/bf16にする
+    # Experimental: fp16/bf16 training for the entire model, including gradients
     if args.full_fp16:
         assert (
             args.mixed_precision == "fp16"
-        ), "full_fp16 requires mixed precision='fp16' / full_fp16を使う場合はmixed_precision='fp16'を指定してください。"
+    ), "full_fp16 requires mixed precision='fp16'"
         accelerator.print("enable full fp16 training.")
         flux.to(weight_dtype)
         controlnet.to(weight_dtype)
@@ -442,7 +437,7 @@ def train(args):
     elif args.full_bf16:
         assert (
             args.mixed_precision == "bf16"
-        ), "full_bf16 requires mixed precision='bf16' / full_bf16を使う場合はmixed_precision='bf16'を指定してください。"
+    ), "full_bf16 requires mixed precision='bf16'"
         accelerator.print("enable full bf16 training.")
         flux.to(weight_dtype)
         controlnet.to(weight_dtype)
@@ -471,13 +466,13 @@ def train(args):
         controlnet = accelerator.prepare(controlnet)  # , device_placement=[not is_swapping_blocks])
         optimizer, train_dataloader, lr_scheduler = accelerator.prepare(optimizer, train_dataloader, lr_scheduler)
 
-    # 実験的機能：勾配も含めたfp16学習を行う　PyTorchにパッチを当ててfp16でのgrad scaleを有効にする
+    # Experimental: enable fp16 grad scaling by patching accelerator
     if args.full_fp16:
         # During deepseed training, accelerate not handles fp16/bf16|mixed precision directly via scaler. Let deepspeed engine do.
         # -> But we think it's ok to patch accelerator even if deepspeed is enabled.
         train_util.patch_accelerator_for_fp16_training(accelerator)
 
-    # resumeする
+    # resume
     train_util.resume_from_local_or_hf_if_specified(accelerator, args)
 
     if args.fused_backward_pass:
@@ -535,26 +530,24 @@ def train(args):
                         parameter_optimizer_map[parameter] = opt_idx
                         num_parameters_per_group[opt_idx] += 1
 
-    # epoch数を計算する
+    # Compute number of epochs
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
     if (args.save_n_epoch_ratio is not None) and (args.save_n_epoch_ratio > 0):
         args.save_every_n_epochs = math.floor(num_train_epochs / args.save_n_epoch_ratio) or 1
 
-    # 学習する
+    # Training
     # total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
-    accelerator.print("running training / 学習開始")
-    accelerator.print(f"  num examples / サンプル数: {train_dataset_group.num_train_images}")
-    accelerator.print(f"  num batches per epoch / 1epochのバッチ数: {len(train_dataloader)}")
-    accelerator.print(f"  num epochs / epoch数: {num_train_epochs}")
-    accelerator.print(
-        f"  batch size per device / バッチサイズ: {', '.join([str(d.batch_size) for d in train_dataset_group.datasets])}"
-    )
+    accelerator.print("running training")
+    accelerator.print(f"  num examples: {train_dataset_group.num_train_images}")
+    accelerator.print(f"  num batches per epoch: {len(train_dataloader)}")
+    accelerator.print(f"  num epochs: {num_train_epochs}")
+    accelerator.print(f"  batch size per device: {', '.join([str(d.batch_size) for d in train_dataset_group.datasets])}")
     # accelerator.print(
-    #     f"  total train batch size (with parallel & distributed & accumulation) / 総バッチサイズ（並列学習、勾配合計含む）: {total_batch_size}"
+    #     f"  total train batch size (with parallel & distributed & accumulation): {total_batch_size}"
     # )
-    accelerator.print(f"  gradient accumulation steps / 勾配を合計するステップ数 = {args.gradient_accumulation_steps}")
-    accelerator.print(f"  total optimization steps / 学習ステップ数: {args.max_train_steps}")
+    accelerator.print(f"  gradient accumulation steps = {args.gradient_accumulation_steps}")
+    accelerator.print(f"  total optimization steps: {args.max_train_steps}")
 
     progress_bar = tqdm(range(args.max_train_steps), smoothing=0, disable=not accelerator.is_local_main_process, desc="steps")
     global_step = 0
@@ -610,7 +603,7 @@ def train(args):
                         # encode images to latents. images are [-1, 1]
                         latents = ae.encode(batch["images"].to(ae.dtype)).to(accelerator.device, dtype=weight_dtype)
 
-                    # NaNが含まれていれば警告を表示し0に置き換える
+                    # if NaN is found, warn and replace with zeros
                     if torch.any(torch.isnan(latents)):
                         accelerator.print("NaN found in latents, replacing with zeros")
                         latents = torch.nan_to_num(latents, 0, out=latents)
@@ -701,7 +694,7 @@ def train(args):
                     loss = apply_masked_loss(loss, batch)
                 loss = loss.mean([1, 2, 3])
 
-                loss_weights = batch["loss_weights"]  # 各sampleごとのweight
+                loss_weights = batch["loss_weights"]  # per-sample weights
                 loss = loss * loss_weights
                 loss = loss.mean()
 
@@ -743,7 +736,7 @@ def train(args):
                     controlnet=controlnet,
                 )
 
-                # 指定ステップごとにモデルを保存
+                # Save model every N steps if specified
                 if args.save_every_n_steps is not None and global_step % args.save_every_n_steps == 0:
                     accelerator.wait_for_everyone()
                     if accelerator.is_main_process:
@@ -759,7 +752,7 @@ def train(args):
                         )
                 optimizer_train_fn()
 
-            current_loss = loss.detach().item()  # 平均なのでbatch sizeは関係ないはず
+            current_loss = loss.detach().item()  # since it's averaged, batch size shouldn't matter
             if len(accelerator.trackers) > 0:
                 logs = {"loss": current_loss}
                 train_util.append_lr_to_logs(logs, lr_scheduler, args.optimizer_type, including_unet=True)
@@ -809,7 +802,7 @@ def train(args):
     if args.save_state or args.save_state_on_train_end:
         train_util.save_state_on_train_end(args, accelerator)
 
-    del accelerator  # この後メモリを使うのでこれは消す
+    del accelerator  # free memory for the following operations
 
     if is_main_process:
         flux_train_utils.save_flux_model_on_train_end(args, save_dtype, epoch, global_step, controlnet)
@@ -836,41 +829,41 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mem_eff_save",
         action="store_true",
-        help="[EXPERIMENTAL] use memory efficient custom model saving method / メモリ効率の良い独自のモデル保存方法を使う",
+        help="[EXPERIMENTAL] use a memory-efficient custom model saving method",
     )
 
     parser.add_argument(
         "--fused_optimizer_groups",
         type=int,
         default=None,
-        help="**this option is not working** will be removed in the future / このオプションは動作しません。将来削除されます",
+        help="[Deprecated] This option does not work and will be removed in the future.",
     )
     parser.add_argument(
         "--blockwise_fused_optimizers",
         action="store_true",
-        help="enable blockwise optimizers for fused backward pass and optimizer step / fused backward passとoptimizer step のためブロック単位のoptimizerを有効にする",
+        help="Enable blockwise optimizers for fused backward pass and optimizer step",
     )
     parser.add_argument(
         "--skip_latents_validity_check",
         action="store_true",
-        help="[Deprecated] use 'skip_cache_check' instead / 代わりに 'skip_cache_check' を使用してください",
+        help="[Deprecated] Use 'skip_cache_check' instead.",
     )
     parser.add_argument(
         "--double_blocks_to_swap",
         type=int,
         default=None,
-        help="[Deprecated] use 'blocks_to_swap' instead / 代わりに 'blocks_to_swap' を使用してください",
+    help="[Deprecated] use 'blocks_to_swap' instead",
     )
     parser.add_argument(
         "--single_blocks_to_swap",
         type=int,
         default=None,
-        help="[Deprecated] use 'blocks_to_swap' instead / 代わりに 'blocks_to_swap' を使用してください",
+    help="[Deprecated] use 'blocks_to_swap' instead",
     )
     parser.add_argument(
         "--cpu_offload_checkpointing",
         action="store_true",
-        help="[EXPERIMENTAL] enable offloading of tensors to CPU during checkpointing / チェックポイント時にテンソルをCPUにオフロードする",
+    help="[EXPERIMENTAL] enable offloading of tensors to CPU during checkpointing",
     )
     return parser
 
