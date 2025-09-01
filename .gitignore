@@ -1,0 +1,103 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.pyo
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.conda/
+conda-env/
+
+# Packaging / build artifacts
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+.wheels/
+
+# Test / lint / type caches
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.pytype/
+.ruff_cache/
+.tox/
+.nox/
+
+# Logs & caches
+*.log
+logs/
+.cache/
+.local/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# --- Editors/IDE ---
+.vscode/
+.idea/
+*.code-workspace
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- Node / JS ---
+node_modules/
+.pnpm-store/
+.yarn/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.npm/
+.bun/
+
+# --- Data & Models (large/binary) ---
+# Folders commonly containing large artifacts
+models/
+datasets/
+outputs/
+checkpoints/
+weights/
+experiments/
+runs/
+wandb/
+lightning_logs/
+
+# Common large file types for ML
+*.safetensors
+*.ckpt
+*.pt
+*.bin
+*.npz
+*.npy
+*.h5
+*.onnx
+*.msgpack
+*.tar
+*.tar.gz
+*.zip
+*.7z
+
+# --- Env / secrets ---
+.env
+.env.*
+*.env
+*.secret
+secret.*
+secrets.json
+
+# --- Misc ---
+*.pid
